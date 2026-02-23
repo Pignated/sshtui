@@ -1,0 +1,3 @@
+[serverConfig]
+secret_key = "~/.ssh/id_ed25519"
+port = 45991
