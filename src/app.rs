@@ -2,8 +2,8 @@ use std::{cell::RefCell, sync::Arc};
 
 use ssh_ui::{
     App, AppSession, cursive::{
-        Cursive, Printer, View, theme::{Effect, Style, Theme}, utils::{markup::StyledString, span::SpannedString}, view::{Finder, Nameable, Resizable, SizeConstraint}, views::{
-            Button, EditView, LinearLayout, NamedView, ResizedView, ScrollView, TextView
+        Cursive, Printer, View, theme::{Effect, Palette, Style, Theme}, utils::{markup::StyledString, span::SpannedString}, view::{Finder, Nameable, Resizable, SizeConstraint}, views::{
+            Button, Dialog, EditView, LinearLayout, NamedView, ResizedView, ScrollView, TextView
         }
     }
 };
@@ -12,13 +12,15 @@ use tokio::{runtime::Handle, sync::broadcast};
 pub struct TestApp {
     broadcast_tx: broadcast::Sender<SpannedString<Style>>,
     user_tx: broadcast::Sender<SpannedString<Style>>,
+    palette: Palette
 }
 
 impl TestApp {
-    pub fn new(broadcast_tx: broadcast::Sender<SpannedString<Style>>, user_tx: broadcast::Sender<SpannedString<Style>>) -> Self {
+    pub fn new(broadcast_tx: broadcast::Sender<SpannedString<Style>>, user_tx: broadcast::Sender<SpannedString<Style>>, palette: Palette) -> Self {
         Self {
             broadcast_tx,
             user_tx,
+            palette
         }
     }
 }
@@ -31,18 +33,19 @@ impl App for TestApp {
     fn new_session(&self) -> Box<dyn ssh_ui::AppSession> {
         let sender = self.user_tx.clone();
         let receiver = self.broadcast_tx.subscribe();
-        Box::new(TestAppSession::new(sender,receiver))
+        Box::new(TestAppSession::new(sender,receiver, self.palette.clone()))
     }
 }
 
 struct TestAppSession {
     sender: broadcast::Sender<SpannedString<Style>>,
-    receiver: broadcast::Receiver<SpannedString<Style>>
+    receiver: broadcast::Receiver<SpannedString<Style>>,
+    palette: Palette,
 }
 
 impl TestAppSession {
-    pub fn new(sender: broadcast::Sender<SpannedString<Style>>, receiver: broadcast::Receiver<SpannedString<Style>>) -> Self {
-        Self {sender, receiver}
+    pub fn new(sender: broadcast::Sender<SpannedString<Style>>, receiver: broadcast::Receiver<SpannedString<Style>>, palette: Palette) -> Self {
+        Self {sender, receiver, palette}
     }
 }
 
@@ -109,9 +112,9 @@ impl AppSession for TestAppSession {
         outer_window.add_child(lower_window);
         let theme = Theme {
             shadow: false,
+            palette: self.palette.clone(),
             ..Default::default()
         };
-        
         let outer_window = ListenHandler{
             inner: RefCell::new(outer_window),
             rx: RefCell::new(self.receiver.resubscribe())
@@ -123,9 +126,11 @@ impl AppSession for TestAppSession {
             s.call_on_name("outerScrollSize", |view: &mut ResizedView<NamedView<ScrollView<NamedView<LinearLayout>>>>| {
                 view.set_constraints(SizeConstraint::Full, SizeConstraint::Full);
             });
+            s.set_window_title("SSH Chat");//TODO get from config
 
         }));
         siv.set_theme(theme);
+        let outer_window = Dialog::around(outer_window).title("SSH Chat"); // TODO get from config
         Ok(Box::new(outer_window))
     }
 }

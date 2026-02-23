@@ -1,0 +1,10 @@
+[server_config]
+secret_key = "/home/<username>/.ssh/id_ed25519"
+port = 45991
+[colors]
+bg = "ff0034"
+title = "00ff00"
+view_window = "aac5c5"
+#text = "ffffff"
+#textbox = "ffffff"
+#highlight = "ffffff"
