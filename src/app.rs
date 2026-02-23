@@ -1,5 +1,6 @@
 use std::{cell::RefCell, sync::Arc};
 
+use markdown_ast::{Block, markdown_to_ast};
 use ssh_ui::{
     App, AppSession, cursive::{
         Cursive, Printer, View, theme::{Effect, Palette, Style, Theme}, utils::{markup::StyledString, span::SpannedString}, view::{Finder, Nameable, Resizable, SizeConstraint}, views::{
@@ -202,10 +203,19 @@ impl View for ListenHandler {
 
 
 fn create_message(text: String, username: Arc<String>) -> SpannedString<Style> {
+    //TODO Use markdown_ast to convert text to Inline, then work through that tree to generate
+    //the different ways to effect text. Likely this will require a separate parsing function that
+    //returns SpannedString and is recursive
     let mut message_text = StyledString::styled((*username).clone(),Effect::Bold);
     message_text.append_plain(": ");
     message_text.append_plain(text);
     message_text
+}
+fn parse_message_text(text:String) -> SpannedString<Style> {
+    parse_inline(markdown_to_ast(&text))
+}
+fn parse_inline(text: Vec<Block>) ->SpannedString<Style> {
+    todo!()
 }
 fn send_message(s: &mut Cursive, txt: String, user: Arc<String>, sender: &broadcast::Sender<SpannedString<Style>>) {
     if txt.chars().all(char::is_whitespace) {
