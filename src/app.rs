@@ -2,8 +2,8 @@ use std::{cell::RefCell, sync::Arc};
 
 use ssh_ui::{
     App, AppSession, cursive::{
-        Cursive, Printer, View, theme::{Effect, Style, Theme}, utils::{markup::StyledString, span::SpannedString}, view::{Finder, Nameable, Resizable}, views::{
-            Button, EditView, LinearLayout, NamedView, ScrollView, TextView
+        Cursive, Printer, View, theme::{Effect, Style, Theme}, utils::{markup::StyledString, span::SpannedString}, view::{Finder, Nameable, Resizable, SizeConstraint}, views::{
+            Button, EditView, LinearLayout, NamedView, ResizedView, ScrollView, TextView
         }
     }
 };
@@ -82,6 +82,7 @@ impl AppSession for TestAppSession {
             })
             .with_name("editBox")
             .max_height(1)
+            .with_name("editBoxSize")
             .min_width(50);
         let local_sender = self.sender.clone();
         let local_user_2 = shared_user.clone();
@@ -110,10 +111,24 @@ impl AppSession for TestAppSession {
             shadow: false,
             ..Default::default()
         };
+        
         let outer_window = ListenHandler{
             inner: RefCell::new(outer_window),
             rx: RefCell::new(self.receiver.resubscribe())
         };
+        let _ = siv.cb_sink().send(Box::new(|s| {
+            let z = s.call_on_name("editBoxSize", |view: &mut ResizedView<NamedView<EditView>>| {
+                println!("aaa");
+                view.set_constraints(SizeConstraint::Full , SizeConstraint::Fixed(1));
+                true
+            }).unwrap_or_default();
+            if z {
+                println!("wooo");
+            } else {
+                println!("nooo");
+            }
+
+        }));
         siv.set_theme(theme);
         Ok(Box::new(outer_window))
     }
