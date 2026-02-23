@@ -57,7 +57,7 @@ impl AppSession for TestAppSession {
         siv.set_autorefresh(true);
         let mut outer_window = LinearLayout::vertical();
         let inside_scroll = LinearLayout::vertical().with_name("scrollWindow");
-        let scroll_window = ScrollView::new(inside_scroll).with_name("outerScroll").min_height(15).with_name("outerScrollSize");
+        let scroll_window = ScrollView::new(inside_scroll).with_name("outerScroll").min_height(15);
         let mut lower_window = LinearLayout::horizontal();
         let username = match pub_key {
             Some(key) => {
@@ -117,12 +117,16 @@ impl AppSession for TestAppSession {
             rx: RefCell::new(self.receiver.resubscribe())
         };
         let _ = siv.cb_sink().send(Box::new(|s| {
-            s.call_on_name("editBoxSize", |view: &mut ResizedView<NamedView<EditView>>| {
+            let z = s.call_on_name("editBoxSize", |view: &mut ResizedView<NamedView<EditView>>| {
+                println!("aaa");
                 view.set_constraints(SizeConstraint::Full , SizeConstraint::Fixed(1));
-            });
-            s.call_on_name("outerScrollSize", |view: &mut ResizedView<NamedView<ScrollView<NamedView<LinearLayout>>>>| {
-                view.set_constraints(SizeConstraint::Full, SizeConstraint::Full);
-            });
+                true
+            }).unwrap_or_default();
+            if z {
+                println!("wooo");
+            } else {
+                println!("nooo");
+            }
 
         }));
         siv.set_theme(theme);
