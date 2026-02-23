@@ -1,14 +1,14 @@
 use serde::Deserialize;
 #[derive(Debug, Deserialize)]
 pub struct Config {
-    serverConfig:ServerConfig
+    server_config:ServerConfig
 }
 impl Config {
     pub fn get_sk(&self) -> String{
-        self.config.secret_key.clone()
+        self.server_config.secret_key.clone()
     }
     pub fn get_port(&self) -> u16 {
-        self.config.port
+        self.server_config.port
     }
 }
 #[derive(Debug,Deserialize)]
