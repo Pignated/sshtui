@@ -4,7 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+cursive = { version = "0.21.1", features = ["markdown"] }
 serde = { version = "1.0.228", features = ["derive"] }
-ssh_ui = "0.4.1"
+ssh_ui = { git = "https://github.com/Pignated/ssh_ui", branch = "main", features = ["cursive-markdown"] }
 tokio = "1.49.0"
 toml = "1.0.3"
