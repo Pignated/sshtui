@@ -1,14 +1,12 @@
-use std::{cell::RefCell, sync::Arc};
+use std::sync::{Arc, Mutex};
 
+use cursive::utils::markup::cursup::parse;
 use ssh_ui::{
     App, AppSession,
     cursive::{
         Cursive, Printer, View,
         theme::{Effect, Palette, Style, Theme},
-        utils::{
-            markup::{StyledString, markdown::Parser},
-            span::SpannedString,
-        },
+        utils::{markup::StyledString, span::SpannedString},
         view::{Finder, Nameable, Resizable, SizeConstraint},
         views::{
             Button, Dialog, EditView, LinearLayout, NamedView, ResizedView, ScrollView, TextView,
@@ -137,8 +135,8 @@ impl AppSession for TestAppSession {
             ..Default::default()
         };
         let outer_window = ListenHandler {
-            inner: RefCell::new(outer_window),
-            rx: RefCell::new(self.receiver.resubscribe()),
+            inner: Mutex::new(outer_window),
+            rx: Mutex::new(self.receiver.resubscribe()),
         };
         let _ = siv.cb_sink().send(Box::new(|s| {
             s.call_on_name(
@@ -162,20 +160,23 @@ impl AppSession for TestAppSession {
 }
 
 struct ListenHandler {
-    inner: RefCell<LinearLayout>,
-    rx: RefCell<broadcast::Receiver<SpannedString<Style>>>,
+    inner: Mutex<LinearLayout>,
+    rx: Mutex<broadcast::Receiver<SpannedString<Style>>>,
 }
 
 impl View for ListenHandler {
     fn draw(&self, printer: &Printer) {
-        let mut inner = self.inner.borrow_mut();
+        //this is the first of a handful of lock().expect() chains. There is nothing after any of
+        //the locks that would cause a panic, so the lock should never get poisoned. If this is
+        //ever found to be incorrect, please lmk or push a better alternative.
+        let mut inner = self.inner.lock().expect("aaa");
         let is_on_bottom = inner
             .call_on_name(
                 "outerScroll",
                 |view: &mut ScrollView<NamedView<LinearLayout>>| view.is_at_bottom(),
             )
             .unwrap_or_default();
-        while let Ok(str) = self.rx.borrow_mut().try_recv() {
+        while let Ok(str) = self.rx.lock().expect("zzz").try_recv() {
             inner.call_on_name("scrollWindow", |view: &mut LinearLayout| {
                 let new_chat = TextView::new(str);
                 view.add_child(new_chat);
@@ -197,22 +198,22 @@ impl View for ListenHandler {
         inner.draw(printer);
     }
     fn layout(&mut self, size: ssh_ui::cursive::Vec2) {
-        self.inner.get_mut().layout(size);
+        self.inner.lock().expect("z").layout(size);
     }
     fn required_size(&mut self, constraint: ssh_ui::cursive::Vec2) -> ssh_ui::cursive::Vec2 {
-        self.inner.get_mut().required_size(constraint)
+        self.inner.lock().expect("a").required_size(constraint)
     }
     fn on_event(
         &mut self,
         event: ssh_ui::cursive::event::Event,
     ) -> ssh_ui::cursive::event::EventResult {
-        self.inner.get_mut().on_event(event)
+        self.inner.lock().expect("a").on_event(event)
     }
     fn focus_view(
         &mut self,
         sel: &ssh_ui::cursive::view::Selector,
     ) -> Result<ssh_ui::cursive::event::EventResult, ssh_ui::cursive::view::ViewNotFound> {
-        self.inner.get_mut().focus_view(sel)
+        self.inner.lock().expect("a").focus_view(sel)
     }
     fn type_name(&self) -> &'static str {
         "ListenHandler"
@@ -221,31 +222,27 @@ impl View for ListenHandler {
         &mut self,
         source: ssh_ui::cursive::direction::Direction,
     ) -> Result<ssh_ui::cursive::event::EventResult, ssh_ui::cursive::view::CannotFocus> {
-        self.inner.get_mut().take_focus(source)
+        self.inner.lock().expect("aaa").take_focus(source)
     }
     fn call_on_any(
         &mut self,
         sel: &ssh_ui::cursive::view::Selector,
         cb: ssh_ui::cursive::event::AnyCb,
     ) {
-        self.inner.get_mut().call_on_any(sel, cb);
+        self.inner.lock().expect("aaa").call_on_any(sel, cb);
     }
     fn needs_relayout(&self) -> bool {
-        self.inner.borrow().needs_relayout()
+        self.inner.lock().expect("aaaaaaa").needs_relayout()
     }
     fn important_area(&self, view_size: ssh_ui::cursive::Vec2) -> ssh_ui::cursive::Rect {
-        self.inner.borrow().important_area(view_size)
+        self.inner.lock().expect("rahhh").important_area(view_size)
     }
 }
 
 fn create_message(text: String, username: Arc<String>) -> SpannedString<Style> {
     let mut message_text = StyledString::styled((*username).clone(), Effect::Bold);
     message_text.append_plain(": ");
-    let parser = Parser::new(&text);
-    for s in parser {
-        let span_idx = s.resolve(&text);
-        message_text.append_styled(span_idx.content, *span_idx.attr);
-    }
+    message_text.append(parse(&text));
     message_text
 }
 fn send_message(
