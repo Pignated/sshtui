@@ -1,3 +1,0 @@
-[server_config]
-secret_key = "/home/<username>/.ssh/id_ed25519"
-port = 45991
