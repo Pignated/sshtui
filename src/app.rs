@@ -259,7 +259,13 @@ fn create_message(
         Some(key) => {
             let mut key_bytes = key.public_key_bytes();
             match key_bytes.pop() {
-                Some(v) => Color::from_256colors(v),
+                Some(v) => {
+                    let mut color_num = v % 16;
+                    if color_num == 15 {
+                        color_num = 16
+                    }
+                    Color::from_256colors(color_num)
+                }
                 None => BaseColor::Black.dark(),
             }
         }
