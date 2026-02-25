@@ -1,6 +1,9 @@
 use std::sync::{Arc, Mutex};
 
-use cursive::utils::markup::cursup::parse;
+use cursive::{
+    theme::{BaseColor, Color},
+    utils::markup::cursup::parse,
+};
 use ssh_ui::{
     App, AppSession,
     cursive::{
@@ -12,6 +15,7 @@ use ssh_ui::{
             Button, Dialog, EditView, LinearLayout, NamedView, ResizedView, ScrollView, TextView,
         },
     },
+    russh_keys::PublicKeyBase64,
 };
 use tokio::{runtime::Handle, sync::broadcast};
 
@@ -81,7 +85,7 @@ impl AppSession for TestAppSession {
             .min_height(15)
             .with_name("outerScrollSize");
         let mut lower_window = LinearLayout::horizontal();
-        let username = match pub_key {
+        let username = match pub_key.clone() {
             Some(key) => {
                 let key_copy = key.clone();
                 let finger = key_copy.fingerprint().clone();
@@ -95,12 +99,19 @@ impl AppSession for TestAppSession {
         let shared_user = Arc::new(username.to_owned());
         let local_user = shared_user.clone();
         let local_sender = self.sender.clone();
+        let pub_key_clone = pub_key.clone();
         let text_view = EditView::new()
             .on_submit_mut(move |s, txt| {
                 s.call_on_name("editBox", |view: &mut EditView| {
                     view.set_content("");
                 });
-                send_message(s, txt.to_string(), local_user.clone(), &local_sender);
+                send_message(
+                    s,
+                    txt.to_string(),
+                    local_user.clone(),
+                    &local_sender,
+                    pub_key_clone.clone(),
+                );
             })
             .with_name("editBox")
             .max_height(1)
@@ -118,7 +129,7 @@ impl AppSession for TestAppSession {
                 Some(txt) => txt,
                 None => return,
             };
-            send_message(s, txt, local_user_2.clone(), &local_sender);
+            send_message(s, txt, local_user_2.clone(), &local_sender, pub_key.clone());
         });
         let quit_button = Button::new("Quit", |s| {
             s.quit();
@@ -239,8 +250,26 @@ impl View for ListenHandler {
     }
 }
 
-fn create_message(text: String, username: Arc<String>) -> SpannedString<Style> {
-    let mut message_text = StyledString::styled((*username).clone(), Effect::Bold);
+fn create_message(
+    text: String,
+    username: Arc<String>,
+    key: Option<ssh_ui::russh_keys::key::PublicKey>,
+) -> SpannedString<Style> {
+    let color = match key {
+        Some(key) => {
+            let mut key_bytes = key.public_key_bytes();
+            match key_bytes.pop() {
+                Some(v) => Color::from_256colors(v),
+                None => BaseColor::Black.dark(),
+            }
+        }
+        None => BaseColor::Black.dark(),
+    };
+    let mut message_text = StyledString::styled(
+        (*username).clone(),
+        Style::merge(&[Effect::Bold.into(), color.into()]),
+    );
+
     message_text.append_plain(": ");
     message_text.append(parse(&text));
     message_text
@@ -250,6 +279,7 @@ fn send_message(
     txt: String,
     user: Arc<String>,
     sender: &broadcast::Sender<SpannedString<Style>>,
+    key: Option<ssh_ui::russh_keys::key::PublicKey>,
 ) {
     if txt.chars().all(char::is_whitespace) {
         s.call_on_name("editBox", |view: &mut EditView| {
@@ -257,7 +287,7 @@ fn send_message(
         });
         return;
     }
-    let out_str = create_message(txt, user);
+    let out_str = create_message(txt, user, key);
     let sender_copy = sender.clone();
     let handle = Handle::current();
     handle.block_on(async {
